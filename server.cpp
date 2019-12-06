@@ -6,7 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <fcntl.h>
+#include "interaction.h"
 #define port 1100
 
 int main(void)
@@ -42,7 +43,8 @@ int main(void)
 		exit(EXIT_FAILURE);
 	}
 
-	int buf = 0;
+	ServerFunc funcNumber;
+	char path[4096];
 	while (true)
 	{
 		printf("start waiting for a new connection...\n");
@@ -54,21 +56,49 @@ int main(void)
 			exit(EXIT_FAILURE);
 		}
 
-		while (buf != -1)
+		recv(connectFD, &funcNumber, sizeof(ServerFunc), 0);
+
+		switch (funcNumber)
 		{
-			if (read(connectFD, &buf, 4) < 0)
+		//a file is requested
+		case ReceiveFile:
+		{
+			if (recv(connectFD, &path, 4096, 0) == -1)
 			{
 				perror("can't read the data\n");
 				break;
 			}
-			else
+
+			//int fileFD = open(path, O_RDONLY, S_IRUSR | S_IWUSR);
+			FILE *fileFD = fopen("11.jpg", "r");
+			// if (fileFD == -1)
+			// {
+			// 	printf("can't open the requested file,%s\n", path);
+			// 	break;
+			// }
+
+			int fileBufSize = 4096;
+			char fileBuf[4096];
+			ssize_t readBytes;
+			ssize_t sentBytes;
+			while ((readBytes = fread(&fileBuf, 1, fileBufSize, fileFD)) > 0)
 			{
-				printf("received:%i\n", buf);
+				sentBytes = send(connectFD, &fileBuf, readBytes, 0);
+				if (readBytes != sentBytes)
+				{
+					perror("send file error\n");
+					break;
+				}
+				printf("send OK\n");
 			}
+			fclose(fileFD);
+		}
+		break;
+		default:
+			break;
 		}
 
-		printf("connection shut down\n");
-		buf = 0;
+		printf("connection is shutting down...\n");
 		shutdown(connectFD, SHUT_RDWR);
 		close(connectFD);
 	}
