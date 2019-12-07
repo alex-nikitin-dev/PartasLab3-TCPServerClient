@@ -8,8 +8,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include "interaction.h"
-#define port 1100
-
+#include "server.h"
 int main(void)
 {
 	struct sockaddr_in sockAddr;
@@ -44,7 +43,6 @@ int main(void)
 	}
 
 	ServerFunc funcNumber;
-	char path[4096];
 	while (true)
 	{
 		printf("start waiting for a new connection...\n");
@@ -63,32 +61,26 @@ int main(void)
 		//a file is requested
 		case ReceiveFile:
 		{
-			if (recv(connectFD, &path, 4096, 0) == -1)
+			printf("get connection to send a file...\n");
+			char path[4096];
+			if (recv(connectFD, &path, pathLength, 0) == -1)
 			{
 				perror("can't read the data\n");
 				break;
 			}
-
-			//int fileFD = open(path, O_RDONLY, S_IRUSR | S_IWUSR);
-			FILE *fileFD = fopen("11.jpg", "r");
-			// if (fileFD == -1)
-			// {
-			// 	printf("can't open the requested file,%s\n", path);
-			// 	break;
-			// }
-
-			int fileBufSize = 4096;
-			char fileBuf[4096];
-			ssize_t readBytes;
-			ssize_t sentBytes;
-			while ((readBytes = fread(&fileBuf, 1, fileBufSize, fileFD)) > 0)
+			FILE *fileFD = fopen(path, "r");
+			if (fileFD == NULL)
 			{
-				sentBytes = send(connectFD, &fileBuf, readBytes, 0);
-				if (readBytes != sentBytes)
-				{
-					perror("send file error\n");
-					break;
-				}
+				printf("can't open the file %s\n", path);
+				break;
+			}
+			printf("sending file %s...\n", path);
+			if (!SendFile(fileFD, 4096, connectFD))
+			{
+				perror("can't send the file\n");
+			}
+			else
+			{
 				printf("send OK\n");
 			}
 			fclose(fileFD);
@@ -104,4 +96,20 @@ int main(void)
 	}
 
 	return 0;
+}
+
+bool SendFile(FILE *fileFD, int fileBufSize, int connectFD)
+{
+	char fileBuf[fileBufSize];
+	ssize_t readBytes;
+	ssize_t sentBytes;
+	while ((readBytes = fread(&fileBuf, 1, fileBufSize, fileFD)) > 0)
+	{
+		sentBytes = send(connectFD, &fileBuf, readBytes, 0);
+		if (readBytes != sentBytes)
+		{
+			return false;
+		}
+	}
+	return true;
 }
