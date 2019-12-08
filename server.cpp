@@ -36,7 +36,7 @@ int main(void)
 			SendFile(fileFD, 4096, connectFD);
 		}
 		break;
-		case 1:
+		case GetFolderContent:
 		{
 		}
 		break;

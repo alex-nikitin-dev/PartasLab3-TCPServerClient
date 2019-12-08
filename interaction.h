@@ -3,5 +3,6 @@
 #define pathLength 4096
 enum ServerFunc
 {
-    ReceiveFile = 0
+    ReceiveFile = 1,
+    GetFolderContent = 2
 };
