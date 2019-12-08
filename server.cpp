@@ -78,6 +78,7 @@ bool ReceivePath(int connectFD, char *path, int length)
 
 bool SendFile(FILE *fileFD, int fileBufSize, int connectFD)
 {
+	printf("start sending the file...\n");
 	char fileBuf[fileBufSize];
 	ssize_t readBytes;
 	ssize_t sentBytes;

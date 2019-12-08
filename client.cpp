@@ -44,7 +44,10 @@ int main()
 		return EXIT_FAILURE;
 	}
 
-	const char *pathToReceive = "11.jpg";
+	char pathToReceive[pathLength];
+	printf("enter file path to receive:");
+	scanf("%s", pathToReceive);
+
 	printf("Start receiving the file %s from server...\n", pathToReceive);
 	ServerFunc func = ReceiveFile;
 	if (send(socketFD, &func, sizeof(ServerFunc), 0) < 0)
@@ -63,7 +66,9 @@ int main()
 
 	char buf[4096];
 	ssize_t receivedBytes;
-	const char *pathToSave = "111.jpg";
+	char pathToSave[pathLength];
+	printf("enter file path to save:");
+	scanf("%s", pathToSave);
 	FILE *fileFD = fopen(pathToSave, "wb");
 	if (fileFD == nullptr)
 	{
@@ -79,12 +84,13 @@ int main()
 		close(socketFD);
 		return EXIT_FAILURE;
 	}
-
+	bool fileExists = false;
 	while ((receivedBytes = recv(socketFD, buf, 4096, 0)) > 0)
 	{
 		int wr = fwrite(buf, 1, receivedBytes, fileFD);
+		fileExists = true;
 	}
-	if (receivedBytes == -1)
+	if (receivedBytes == -1 || fileExists == false)
 	{
 		printf("can't receive file %s from the server\n", pathToReceive);
 		fclose(fileFD);
