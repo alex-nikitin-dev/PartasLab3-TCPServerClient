@@ -11,13 +11,111 @@
 #include "server.h"
 int main(void)
 {
+	int socketFD;
+	if (!ServerInitializing(socketFD, ServerPort))
+		return EXIT_FAILURE;
+	ServerFunc funcNumber;
+	int connectFD;
+	while (true)
+	{
+		if (!WaitForNewConnection(socketFD, connectFD))
+			return EXIT_FAILURE;
+		recv(connectFD, &funcNumber, sizeof(ServerFunc), 0);
+		char path[pathLength];
+		FILE *fileFD;
+		switch (funcNumber)
+		{
+		//a file is requested
+		case ReceiveFile:
+		{
+			printf("got connection to send a file...\n");
+			if (!ReceivePath(connectFD, path, pathLength))
+				break;
+			if ((fileFD = OpenFile(path, "r")) == nullptr)
+				break;
+			SendFile(fileFD, 4096, connectFD);
+		}
+		break;
+		case 1:
+		{
+		}
+		break;
+		default:
+			break;
+		}
+
+		if (fileFD != nullptr)
+			fclose(fileFD);
+		printf("connection is shutting down...\n");
+		shutdown(connectFD, SHUT_RDWR);
+		close(connectFD);
+	}
+
+	close(socketFD);
+	return 0;
+}
+
+FILE *OpenFile(const char *path, const char *mod)
+{
+	FILE *fileFD = fopen(path, mod);
+	if (fileFD == nullptr)
+	{
+		printf("can't open the file %s\n", path);
+		return nullptr;
+	}
+	return fileFD;
+}
+
+bool ReceivePath(int connectFD, char *path, int length)
+{
+	if (recv(connectFD, path, length, 0) == -1)
+	{
+		perror("can't read the data\n");
+		return false;
+	}
+	return true;
+}
+
+bool SendFile(FILE *fileFD, int fileBufSize, int connectFD)
+{
+	char fileBuf[fileBufSize];
+	ssize_t readBytes;
+	ssize_t sentBytes;
+	while ((readBytes = fread(&fileBuf, 1, fileBufSize, fileFD)) > 0)
+	{
+		sentBytes = send(connectFD, &fileBuf, readBytes, 0);
+		if (readBytes != sentBytes)
+		{
+			perror("can't send the file\n");
+			return false;
+		}
+	}
+	printf("send OK\n");
+	return true;
+}
+
+bool WaitForNewConnection(int socketFD, int &connectFD)
+{
+	printf("start waiting for a new connection...\n");
+	connectFD = accept(socketFD, 0, 0);
+	if (connectFD < 0)
+	{
+		perror("can't accept a connection\n");
+		close(socketFD);
+		return false;
+	}
+	return true;
+}
+
+bool ServerInitializing(int &socketFD, int port)
+{
 	struct sockaddr_in sockAddr;
-	int socketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+	socketFD = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
 	if (socketFD == -1)
 	{
 		perror("can't create a socket\n");
-		exit(EXIT_FAILURE);
+		return false;
 	}
 	//fill structure with 0
 	memset(&sockAddr, 0, sizeof(sockAddr));
@@ -31,7 +129,7 @@ int main(void)
 		perror("can't bind the socket to address\n");
 
 		close(socketFD);
-		exit(EXIT_FAILURE);
+		return false;
 	}
 
 	if (listen(socketFD, 10) == -1)
@@ -39,77 +137,8 @@ int main(void)
 		perror("can't start listening for connections on the socket\n");
 
 		close(socketFD);
-		exit(EXIT_FAILURE);
+		return false;
 	}
 
-	ServerFunc funcNumber;
-	while (true)
-	{
-		printf("start waiting for a new connection...\n");
-		int connectFD = accept(socketFD, 0, 0);
-		if (connectFD < 0)
-		{
-			perror("can't accept a connection\n");
-			close(socketFD);
-			exit(EXIT_FAILURE);
-		}
-
-		recv(connectFD, &funcNumber, sizeof(ServerFunc), 0);
-
-		switch (funcNumber)
-		{
-		//a file is requested
-		case ReceiveFile:
-		{
-			printf("get connection to send a file...\n");
-			char path[4096];
-			if (recv(connectFD, &path, pathLength, 0) == -1)
-			{
-				perror("can't read the data\n");
-				break;
-			}
-			FILE *fileFD = fopen(path, "r");
-			if (fileFD == NULL)
-			{
-				printf("can't open the file %s\n", path);
-				break;
-			}
-			printf("sending file %s...\n", path);
-			if (!SendFile(fileFD, 4096, connectFD))
-			{
-				perror("can't send the file\n");
-			}
-			else
-			{
-				printf("send OK\n");
-			}
-			fclose(fileFD);
-		}
-		break;
-		default:
-			break;
-		}
-
-		printf("connection is shutting down...\n");
-		shutdown(connectFD, SHUT_RDWR);
-		close(connectFD);
-	}
-
-	return 0;
-}
-
-bool SendFile(FILE *fileFD, int fileBufSize, int connectFD)
-{
-	char fileBuf[fileBufSize];
-	ssize_t readBytes;
-	ssize_t sentBytes;
-	while ((readBytes = fread(&fileBuf, 1, fileBufSize, fileFD)) > 0)
-	{
-		sentBytes = send(connectFD, &fileBuf, readBytes, 0);
-		if (readBytes != sentBytes)
-		{
-			return false;
-		}
-	}
 	return true;
 }

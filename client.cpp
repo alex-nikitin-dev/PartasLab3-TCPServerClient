@@ -20,7 +20,7 @@ int main()
 	//fill structure with 0
 	memset(&sockAddr, 0, sizeof(sockAddr));
 	sockAddr.sin_family = PF_INET;
-	sockAddr.sin_port = htons(port);
+	sockAddr.sin_port = htons(ServerPort);
 	//convert address to byte-form
 	int binaryAddr = inet_pton(PF_INET, serverIP, &sockAddr.sin_addr);
 
@@ -82,14 +82,14 @@ int main()
 
 	while ((receivedBytes = recv(socketFD, buf, 4096, 0)) > 0)
 	{
-		if (receivedBytes == -1)
-		{
-			printf("can't receive file %s from the server\n", pathToReceive);
-			fclose(fileFD);
-			close(socketFD);
-			return EXIT_FAILURE;
-		}
 		int wr = fwrite(buf, 1, receivedBytes, fileFD);
+	}
+	if (receivedBytes == -1)
+	{
+		printf("can't receive file %s from the server\n", pathToReceive);
+		fclose(fileFD);
+		close(socketFD);
+		return EXIT_FAILURE;
 	}
 	printf("The file %s has beed received successful and saved as %s\n", pathToReceive, pathToSave);
 	fclose(fileFD);
