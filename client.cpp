@@ -11,14 +11,8 @@
 #include "client.h"
 int main(int argc, char *argv[])
 {
-	char ip[255];
-	int port;
+
 	int socketFD;
-	printf("argc=%d\n", argc);
-	for (int i = 0; i < argc; i++)
-	{
-		printf("arg[%d]=%s\n", i, argv[i]);
-	}
 
 	if (argc == 2 && strcmp(argv[1], "help") == 0)
 	{
@@ -28,16 +22,15 @@ int main(int argc, char *argv[])
 	}
 	else if (argc == 6 && strcmp(argv[1], "get-file") == 0)
 	{
-		strcpy(ip, argv[2]);
-		port = atoi(argv[3]);
-		if (!ClientInitialize(socketFD, ip, port))
-			return EXIT_FAILURE;
-		if (!SendMenuFlag(socketFD, ReceiveFile))
+		if (!ClientInitialize(socketFD, argv, ReceiveFile))
 			return EXIT_FAILURE;
 		ReceiveFileFromServer(socketFD, argv[4], argv[5], pathLength, 4096);
 	}
 	else if (argc == 5 && strcmp(argv[1], "show-dir") == 0)
 	{
+		if (!ClientInitialize(socketFD, argv, GetFolderContent))
+			return EXIT_FAILURE;
+		GetFolderContentFromServer(socketFD, argv[4], pathLength, 4096);
 	}
 	else
 	{
@@ -50,16 +43,56 @@ int main(int argc, char *argv[])
 	return 0;
 }
 
+bool ClientInitialize(int &socketFD, char *argv[], ServerFunc func)
+{
+	char ip[255];
+	int port;
+	strcpy(ip, argv[2]);
+	port = atoi(argv[3]);
+	if (!ClientInitialize(socketFD, ip, port))
+		return false;
+	if (!SendMenuFlag(socketFD, func))
+		return false;
+	return true;
+}
+bool GetFolderContentFromServer(int socketFD, char *path, int pathSize, int bufferSizeToReceiving)
+{
+	printf("Start getting content of the path %s from server...\n", path);
+	if (!SendString(socketFD, path))
+		return false;
+	bool receiveAnything = false;
+	char buf[bufferSizeToReceiving];
+	ssize_t receivedBytes;
+	while ((receivedBytes = recv(socketFD, buf, bufferSizeToReceiving, 0)) > 0)
+	{
+		int wr = write(1, buf, receivedBytes);
+		receiveAnything = true;
+	}
+	if (receivedBytes == -1 || receiveAnything == false)
+	{
+		printf("Can't receive content of the path %s from the server\n", path);
+		close(socketFD);
+		return false;
+	}
+	printf("\nThe content of the path %s has beed received successful\n", path);
+	return true;
+}
+bool SendString(int socketFD, char *str)
+{
+	if (send(socketFD, str, strlen(str) + 1, 0) < 0)
+	{
+		printf("Can't send the sting %s to the server\n", str);
+		close(socketFD);
+		return false;
+	}
+	return true;
+}
 bool ReceiveFileFromServer(int socketFD, char *pathToReceive, char *pathToSave, int pathSize, int bufferSizeToReceiving)
 {
 	printf("Start receiving the file %s from server...\n", pathToReceive);
 
-	if (send(socketFD, pathToReceive, strlen(pathToReceive) + 1, 0) < 0)
-	{
-		perror("Can't send path of the file to the server\n");
-		close(socketFD);
+	if (!SendString(socketFD, pathToReceive))
 		return false;
-	}
 
 	char buf[bufferSizeToReceiving];
 	ssize_t receivedBytes;
@@ -142,4 +175,13 @@ bool ClientInitialize(int &socketFD, char *ip, int port)
 		return false;
 	}
 	return true;
+}
+
+void ShowArgs(int argc, char *argv[])
+{
+	printf("argc=%d\n", argc);
+	for (int i = 0; i < argc; i++)
+	{
+		printf("arg[%d]=%s\n", i, argv[i]);
+	}
 }

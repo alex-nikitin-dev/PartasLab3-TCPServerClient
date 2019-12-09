@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include "interaction.h"
 #include "server.h"
+#include <dirent.h>
 int main(void)
 {
 	int socketFD;
@@ -38,6 +39,11 @@ int main(void)
 		break;
 		case GetFolderContent:
 		{
+			printf("got connection to send content of the folder...\n");
+			if (!ReceivePath(connectFD, path, pathLength))
+				break;
+			if (!SendContentOfPath(path, 4096, connectFD))
+				break;
 		}
 		break;
 		default:
@@ -75,7 +81,34 @@ bool ReceivePath(int connectFD, char *path, int length)
 	}
 	return true;
 }
-
+bool SendContentOfPath(char *path, int fileBufSize, int connectFD)
+{
+	printf("start sending the content of the folder %s...\n", path);
+	DIR *dir;
+	struct dirent *ent;
+	if ((dir = opendir(path)) != nullptr)
+	{
+		/* send all the files and directories within directory */
+		char buf[pathLength];
+		while ((ent = readdir(dir)) != NULL)
+		{
+			buf[0] = ent->d_type == DT_DIR ? 'd' : ' ';
+			buf[1] = ' ';
+			buf[2] = '\0';
+			strcat(buf, ent->d_name);
+			strcat(buf, "\n");
+			send(connectFD, buf, strlen(buf), 0);
+		}
+		closedir(dir);
+	}
+	else
+	{
+		printf("can't send the data\n");
+		return false;
+	}
+	printf("send OK\n");
+	return true;
+}
 bool SendFile(FILE *fileFD, int fileBufSize, int connectFD)
 {
 	printf("start sending the file...\n");
